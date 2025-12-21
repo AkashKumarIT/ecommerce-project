@@ -22,29 +22,29 @@ public class ProductController {
         this.productService = productService;
     }
 
-    @GetMapping("/search")
-    public ResponseEntity<List<ProductResponse>> searchProductsByName(@RequestParam String name) {
-        List<ProductResponse> products = productService.searchProductsByName(name);
+    // 🌟 UNIFIED ENDPOINT
+    // Valid Calls:
+    // 1. GET /api/products (Get All)
+    // 2. GET /api/products?search=iphone (Search)
+    // 3. GET /api/products?category=mobile&minPrice=50000 (Filter)
+    // 4. GET /api/products?search=samsung&sort=price&direction=asc (Search + Sort)
+    @GetMapping
+    public ResponseEntity<Page<ProductResponse>> getProducts(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) Double minPrice,
+            @RequestParam(required = false) Double maxPrice,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction
+    ) {
+        Page<ProductResponse> products = productService
+                .getAllProducts(search, category, minPrice, maxPrice, page, size, sortBy, direction);
         return ResponseEntity.ok(products);
     }
 
-    @GetMapping("/category/{category}")
-    public ResponseEntity<List<ProductResponse>> filterProductByCategory(@PathVariable String category) {
-        List<ProductResponse> products = productService.filterProductByCategory(category);
-        return ResponseEntity.ok(products);
-    }
 
-    @GetMapping("/price")
-    public ResponseEntity<List<ProductResponse>> filterProductByPrice(@RequestParam Double minPrice, @RequestParam Double maxPrice) {
-        List<ProductResponse> products = productService.filterProductByPrice(minPrice, maxPrice);
-        return ResponseEntity.ok(products);
-    }
-
-    @GetMapping("/filter")
-    public ResponseEntity<List<ProductResponse>> filterProductByCategoryAndPrice(@RequestParam String category, @RequestParam Double minPrice, @RequestParam Double maxPrice) {
-        List<ProductResponse> products = productService.filterProductByCategoryAndPrice(category, minPrice, maxPrice);
-        return ResponseEntity.ok(products);
-    }
 
     @PostMapping
     public ResponseEntity<ProductResponse> createProduct(@Valid @RequestBody ProductRequest req) {
@@ -52,10 +52,6 @@ public class ProductController {
         return ResponseEntity.created(URI.create("/api/products/" + product.getId())).body(product);
     }
 
-    @GetMapping
-    public ResponseEntity<List<ProductResponse>> getAllProducts() {
-        return ResponseEntity.ok(productService.getAllProducts());
-    }
 
     @GetMapping("/{id}")
     public ResponseEntity<ProductResponse> getProductById(@PathVariable UUID id) {
@@ -63,11 +59,14 @@ public class ProductController {
         return ResponseEntity.ok(product);
     }
 
+
+
     @PutMapping("/{id}")
     public ResponseEntity<ProductResponse> updateProduct(@PathVariable UUID id, @Valid @RequestBody ProductRequest req) {
         ProductResponse updatedProduct = productService.updateProduct(id, req);
         return ResponseEntity.ok(updatedProduct);
     }
+
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(@PathVariable UUID id) {
@@ -75,25 +74,6 @@ public class ProductController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/paginated")
-    public Page<ProductResponse> getProductAllPaginated(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "5") int size,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String direction
-    ) {
-        return productService.getAllProductPaginated(page, size, sortBy, direction);
-    }
 
-    @GetMapping("/category/{category}/paginated")
-    public Page<ProductResponse> getProductsByCategoryPaginated(
-            @PathVariable String category,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "5") int size,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String direction
-    ) {
-        return productService.getProductsByCategoryPaginated(category, page, size, sortBy, direction);
-    }
 
 }

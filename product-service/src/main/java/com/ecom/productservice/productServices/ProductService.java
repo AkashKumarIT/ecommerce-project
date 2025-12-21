@@ -6,10 +6,12 @@ import com.ecom.productservice.productDto.ProductRequest;
 import com.ecom.productservice.productDto.ProductResponse;
 import com.ecom.productservice.productModel.Product;
 import com.ecom.productservice.productRepository.ProductRepository;
+import com.ecom.productservice.productRepository.ProductSpecification;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -24,49 +26,21 @@ public class ProductService {
         this.productRepository = productRepository;
     }
 
-    public Page<ProductResponse> getAllProductPaginated(int page, int size, String sortBy, String direction){
-        Sort sort = direction.equalsIgnoreCase("desc")
-                ? Sort.by(sortBy).descending()
-                : Sort.by(sortBy).ascending();
+    public Page<ProductResponse> getAllProducts(String search, String category, Double minPrice, Double maxPrice, int page, int size, String sortBy, String direction){
+        // Create pagination and sorting information
+        Sort sort = direction.equalsIgnoreCase("desc") ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
+        Pageable pagable = PageRequest.of(page, size, sort);
 
-        Pageable pageable = PageRequest.of(page, size, sort);
-        return productRepository.findAll(pageable)
+        // create specification (dynamic query building)
+        Specification<Product> spec = Specification.allOf(
+                ProductSpecification.globalSearch(search),
+                ProductSpecification.hasCategory(category),
+                ProductSpecification.hasPriceBetween(minPrice, maxPrice));
+
+        return productRepository.findAll(spec, pagable)
                 .map(ProductMapper :: toResponse);
     }
 
-    public Page<ProductResponse> getProductsByCategoryPaginated(String category, int page, int size, String sortBy, String direction){
-        Sort sort = direction.equalsIgnoreCase("desc")
-                ? Sort.by(sortBy).descending()
-                : Sort.by(sortBy).ascending();
-
-        Pageable pageable = PageRequest.of(page, size, sort);
-        Page<Product> productPage = productRepository.findByCategoryIgnoreCase(category, pageable);
-        return productPage.map(ProductMapper :: toResponse);
-    }
-
-    public List<ProductResponse> searchProductsByName(String name) {
-        return productRepository.findByNameContainingIgnoreCase(name)
-                .stream().map(ProductMapper :: toResponse)
-                .toList();
-    }
-
-    public List<ProductResponse> filterProductByCategory(String category) {
-        return productRepository.findByCategoryIgnoreCase(category)
-                .stream().map(ProductMapper :: toResponse)
-                .toList();
-    }
-
-    public List<ProductResponse> filterProductByPrice(Double minPrice, Double maxPrice) {
-        return productRepository.findByPriceBetween(minPrice, maxPrice)
-                .stream().map(ProductMapper :: toResponse)
-                .toList();
-    }
-
-    public List<ProductResponse> filterProductByCategoryAndPrice(String category, Double minPrice, Double maxPrice) {
-        return productRepository.findByCategoryIgnoreCaseAndPriceBetween(category, minPrice, maxPrice)
-                .stream().map(ProductMapper :: toResponse)
-                .toList();
-    }
 
     public ProductResponse createProduct(ProductRequest req){
         Product product = Product.builder()
@@ -83,12 +57,6 @@ public class ProductService {
         return ProductMapper.toResponse(product);
     }
 
-    public List<ProductResponse> getAllProducts(){
-        return productRepository.findAll()
-                .stream()
-                .map(ProductMapper :: toResponse)
-                .toList();
-    }
 
     public ProductResponse getProductById(UUID id){
         Product product = productRepository.findById(id)
@@ -97,12 +65,14 @@ public class ProductService {
         return ProductMapper.toResponse(product);
     }
 
+
     public void deleteProduct(UUID id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException("Product with id " + id + " not found"));
 
         productRepository.delete(product);
     }
+
 
     public ProductResponse updateProduct(UUID id, ProductRequest req) {
         Product existingProduct = ProductMapper.toEntity(getProductById(id));
