@@ -7,6 +7,8 @@ import com.ecom.productservice.productDto.ProductResponse;
 import com.ecom.productservice.productModel.Product;
 import com.ecom.productservice.productRepository.ProductRepository;
 import com.ecom.productservice.productRepository.ProductSpecification;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -57,7 +59,7 @@ public class ProductService {
         return ProductMapper.toResponse(product);
     }
 
-
+    @Cacheable(value = "productById", key = "#id")
     public ProductResponse getProductById(UUID id){
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException("Product with id " + id + " not found"));
@@ -66,6 +68,7 @@ public class ProductService {
     }
 
 
+    @CacheEvict(value = "productById", key = "#id")
     public void deleteProduct(UUID id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException("Product with id " + id + " not found"));
@@ -73,7 +76,7 @@ public class ProductService {
         productRepository.delete(product);
     }
 
-
+    @CacheEvict(value = "productById", key = "#id")
     public ProductResponse updateProduct(UUID id, ProductRequest req) {
         Product existingProduct = ProductMapper.toEntity(getProductById(id));
 

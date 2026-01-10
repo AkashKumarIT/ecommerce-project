@@ -1,21 +1,28 @@
 version: "3.8"
 services:
   postgres:
-    image: postgres:15 # This tells Docker to download the official PostgreSQL software (version 15) from Docker Hub.
+    image: bitnami/postgresql:latest
     container_name: product_postgres
     environment:
-      POSTGRES_USER: product_user
-      POSTGRES_PASSWORD: product_pass
-      POSTGRES_DB: productdb
+      POSTGRESQL_USERNAME: product_user
+      POSTGRESQL_PASSWORD: product_pass
+      POSTGRESQL_DATABASE: productdb
+#      TZ: Asia/Kolkata
     ports:
       - "5434:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/bitnami/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U product_user"]
+      test: ["CMD-SHELL", "pg_isready -U product_user -d productdb"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  redis:
+    image: redis:7
+    container_name: product_redis
+    ports:
+      - "6379:6379"
 
 volumes:
   pgdata:
