@@ -4,6 +4,7 @@ import com.ecom.productservice.exception.ProductNotFoundException;
 import com.ecom.productservice.mapper.ProductMapper;
 import com.ecom.productservice.productDto.ProductRequest;
 import com.ecom.productservice.productDto.ProductResponse;
+import com.ecom.productservice.productDto.RestPage;
 import com.ecom.productservice.productModel.Product;
 import com.ecom.productservice.productRepository.ProductRepository;
 import com.ecom.productservice.productRepository.ProductSpecification;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class ProductService {
@@ -28,10 +30,26 @@ public class ProductService {
         this.productRepository = productRepository;
     }
 
-    public Page<ProductResponse> getAllProducts(String search, String category, Double minPrice, Double maxPrice, int page, int size, String sortBy, String direction){
+    @Cacheable(
+            value = "productSearchPage",
+            key = "T(java.util.Objects).toString(#search,'')" +
+                    " + '|' + T(java.util.Objects).toString(#category,'')" +
+                    " + '|' + T(java.util.Objects).toString(#minPrice,'')" +
+                    " + '|' + T(java.util.Objects).toString(#maxPrice,'')" +
+                    " + '|' + #page + '|' + #size + '|' + #sortBy + '|' + #direction"
+    )
+    public Page<ProductResponse> getAllProducts(String search,
+                                                String category,
+                                                Double minPrice,
+                                                Double maxPrice,
+                                                int page,
+                                                int size, String sortBy, String direction){
         // Create pagination and sorting information
-        Sort sort = direction.equalsIgnoreCase("desc") ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
-        Pageable pagable = PageRequest.of(page, size, sort);
+        Sort sort = direction.equalsIgnoreCase("desc")
+                ? Sort.by(sortBy).descending()
+                : Sort.by(sortBy).ascending();
+
+        Pageable pageable = PageRequest.of(page, size, sort);
 
         // create specification (dynamic query building)
         Specification<Product> spec = Specification.allOf(
@@ -39,24 +57,38 @@ public class ProductService {
                 ProductSpecification.hasCategory(category),
                 ProductSpecification.hasPriceBetween(minPrice, maxPrice));
 
-        return productRepository.findAll(spec, pagable)
-                .map(ProductMapper :: toResponse);
+        // 1. Pehle Database se Page nikalo
+        Page<Product> productPage = productRepository.findAll(spec, pageable);
+
+        // 2. Phir DTO list banao
+        List<ProductResponse> responseList = productPage.stream()
+                .map(ProductMapper::toResponse)
+                .collect(Collectors.toList());
+
+        // 3. ✅ MAGIC FIX: PageImpl ki jagah RestPage return karo
+        // Ye class Redis mein save ho sakti hai bina error ke
+        return new RestPage<>(responseList, pageable, productPage.getTotalElements());
     }
 
 
-    public ProductResponse createProduct(ProductRequest req){
-        Product product = Product.builder()
-                .name(req.getName())
-                .description(req.getDescription())
-                .price(req.getPrice())
-                .quantity(req.getQuantity())
-                .imageUrl(req.getImageUrl())
-                .category(req.getCategory())
-                .status(true)
-                .build();
+    public List<ProductResponse> createProducts(List<ProductRequest> requests){
+        List<Product> products = requests.stream()
+                .map(req -> Product.builder()
+                        .name(req.getName())
+                        .description(req.getDescription())
+                        .price(req.getPrice())
+                        .quantity(req.getQuantity())
+                        .imageUrl(req.getImageUrl())
+                        .category(req.getCategory())
+                        .status(true)
+                        .build())
+                .collect(Collectors.toList());
 
-        productRepository.save(product);
-        return ProductMapper.toResponse(product);
+        List<Product> savedProducts = productRepository.saveAll(products);
+
+        return savedProducts.stream()
+                .map(ProductMapper::toResponse)
+                .collect(Collectors.toList());
     }
 
     @Cacheable(value = "productById", key = "#id")
