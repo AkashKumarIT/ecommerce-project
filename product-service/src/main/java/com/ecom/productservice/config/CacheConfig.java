@@ -14,6 +14,10 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
+
 @Configuration
 public class CacheConfig {
 
@@ -21,11 +25,11 @@ public class CacheConfig {
     public CacheManager cacheManager(RedisConnectionFactory factory) {
         ObjectMapper objectMapper = new ObjectMapper();
 
-        // 1. Date Time Support
+        // Date Time Support
         objectMapper.registerModule(new JavaTimeModule());
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-        // 2. Class Type Info (Redis ko batane ke liye ki ye RestPage hai)
+        // Class Type Info (Redis ko batane ke liye ki ye RestPage hai)
         objectMapper.activateDefaultTyping(
                 LaissezFaireSubTypeValidator.instance,
                 ObjectMapper.DefaultTyping.NON_FINAL,
@@ -39,8 +43,24 @@ public class CacheConfig {
                         RedisSerializationContext.SerializationPair.fromSerializer(serializer)
                 );
 
+        // Custom TTL per cache
+        Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
+
+        // Product by ID → 5 minutes
+        cacheConfigs.put(
+                "productById",
+                config.entryTtl(Duration.ofMinutes(5))
+        );
+
+        // Search + pagination → 1 minute
+        cacheConfigs.put(
+                "productSearchPage",
+                config.entryTtl(Duration.ofMinutes(1))
+        );
+
         return RedisCacheManager.builder(factory)
                 .cacheDefaults(config)
+                .withInitialCacheConfigurations(cacheConfigs)
                 .build();
     }
 }
