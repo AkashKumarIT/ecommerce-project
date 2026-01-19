@@ -1,3 +1,9 @@
+# ===== Sensitive config files =====
+application.yml
+application.properties
+docker-compose.yml
+.env
+
 product-service/HELP.md
 target/
 .mvn/wrapper/maven-wrapper.jar

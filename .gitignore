@@ -1,12 +1,10 @@
-# Root .gitignore (D:\e-commerce\.gitignore)
-
 # Ignore all hidden IntelliJ folders
 .idea/
 *.iws
 *.iml
 *.ipr
 
-# Ignore Java build files in ALL services (Safety net for future services)
+# Ignore Java build files in ALL services
 **/target/
 **/mvnw
 **/mvnw.cmd
@@ -14,3 +12,6 @@
 
 # Security
 **/.env
+**/application.yml
+**/application.properties
+**/docker-compose.yml
