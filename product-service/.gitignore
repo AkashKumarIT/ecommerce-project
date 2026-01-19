@@ -1,3 +1,9 @@
+# Ignore local docker compose
+docker-compose.yml
+
+# Ignore application config with secrets
+src/main/resources/application.yml
+
 product-service/HELP.md
 target/
 .mvn/wrapper/maven-wrapper.jar
