@@ -9,6 +9,9 @@ public class ProductRequest {
     @NotBlank(message = "Product name is required")
     private String name;
 
+    @NotBlank(message = "SKU is required")
+    private String sku;
+
     private String description;
 
     @NotNull(message = "Price is required")

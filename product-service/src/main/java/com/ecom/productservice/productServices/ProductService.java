@@ -1,6 +1,10 @@
 package com.ecom.productservice.productServices;
 
+import com.ecom.events.product.ProductCreatedEvent;
+import com.ecom.events.product.ProductQuantityUpdatedEvent;
 import com.ecom.productservice.exception.ProductNotFoundException;
+import com.ecom.productservice.kafka.EventPublisher;
+import com.ecom.productservice.kafka.KafkaTopics;
 import com.ecom.productservice.mapper.ProductMapper;
 import com.ecom.productservice.productDto.ProductRequest;
 import com.ecom.productservice.productDto.ProductResponse;
@@ -8,6 +12,7 @@ import com.ecom.productservice.productDto.RestPage;
 import com.ecom.productservice.productModel.Product;
 import com.ecom.productservice.productRepository.ProductRepository;
 import com.ecom.productservice.productRepository.ProductSpecification;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -25,6 +30,9 @@ import java.util.stream.Collectors;
 public class ProductService {
 
     private final ProductRepository productRepository;
+
+    @Autowired
+    private EventPublisher eventPublisher;
 
     public ProductService(ProductRepository productRepository) {
         this.productRepository = productRepository;
@@ -75,6 +83,7 @@ public class ProductService {
         List<Product> products = requests.stream()
                 .map(req -> Product.builder()
                         .name(req.getName())
+                        .sku(req.getSku())
                         .description(req.getDescription())
                         .price(req.getPrice())
                         .quantity(req.getQuantity())
@@ -85,6 +94,27 @@ public class ProductService {
                 .collect(Collectors.toList());
 
         List<Product> savedProducts = productRepository.saveAll(products);
+        savedProducts.forEach(product -> {
+
+//            ProductCreatedEvent event =
+//                    ProductCreatedEvent.builder()
+//                            .eventType("PRODUCT_CREATED")
+//                            .sku(product.getSku())
+//                            .initialQuantity(product.getQuantity())
+//                            .build();
+
+            ProductCreatedEvent event =
+                    new ProductCreatedEvent(
+                            product.getSku(),
+                            product.getQuantity()
+                    );
+
+            eventPublisher.publish(
+                    KafkaTopics.PRODUCT_EVENTS,
+                    product.getSku(),
+                    event
+            );
+        });
 
         return savedProducts.stream()
                 .map(ProductMapper::toResponse)
@@ -120,6 +150,24 @@ public class ProductService {
         existingProduct.setCategory(req.getCategory());
 
         productRepository.save(existingProduct);
+
+//        ProductQuantityUpdatedEvent event =
+//                ProductQuantityUpdatedEvent.builder()
+//                        .eventType("PRODUCT_QUANTITY_UPDATED")
+//                        .sku(existingProduct.getSku())
+//                        .newQuantity(req.getQuantity())
+//                        .build();
+        ProductQuantityUpdatedEvent event =
+                new ProductQuantityUpdatedEvent(
+                        existingProduct.getSku(),
+                        req.getQuantity()
+                );
+
+        eventPublisher.publish(
+                KafkaTopics.PRODUCT_EVENTS,
+                existingProduct.getSku(),
+                event
+        );
         return ProductMapper.toResponse(existingProduct);
     }
 

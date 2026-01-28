@@ -4,6 +4,8 @@
 *.iml
 *.ipr
 
+docker-compose-kafka.yml
+
 # Ignore Java build files in ALL services
 **/target/
 **/mvnw

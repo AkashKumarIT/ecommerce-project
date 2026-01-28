@@ -17,6 +17,7 @@ public class ProductResponse implements Serializable {
 
     private UUID id;
     private String name;
+    private String sku;
     private String description;
     private Double price;
     private Integer quantity;

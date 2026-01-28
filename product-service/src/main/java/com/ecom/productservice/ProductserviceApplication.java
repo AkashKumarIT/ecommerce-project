@@ -9,10 +9,12 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.kafka.annotation.EnableKafka;
 
 @SpringBootApplication
 @EnableJpaAuditing
 @EnableCaching
+@EnableKafka
 public class ProductserviceApplication {
 
 	public static void main(String[] args) {

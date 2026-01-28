@@ -1,10 +1,4 @@
-# ===== Sensitive config files =====
-**/application.yml
-application.properties
-docker-compose.yml
-.env
-
-product-service/HELP.md
+HELP.md
 target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
@@ -20,7 +14,7 @@ target/
 .sts4-cache
 
 ### IntelliJ IDEA ###
-../../.idea
+.idea
 *.iws
 *.iml
 *.ipr

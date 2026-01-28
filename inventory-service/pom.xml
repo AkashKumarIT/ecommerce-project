@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
+
 	<parent>
 		<groupId>com.ecom</groupId>
 		<artifactId>e-commerce</artifactId>
 		<version>1.0.0</version>
 	</parent>
 
-	<artifactId>product-service</artifactId>
+	<artifactId>inventory-service</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>productservice</name>
-	<description>Producct Microservice</description>
+	<name>inventory-service</name>
+	<description>Inventory Service</description>
 
 	<dependencies>
 		<!-- Spring -->
@@ -35,13 +36,6 @@
 			<scope>runtime</scope>
 		</dependency>
 
-		<!-- Lombok -->
-		<dependency>
-			<groupId>org.projectlombok</groupId>
-			<artifactId>lombok</artifactId>
-			<scope>provided</scope>
-		</dependency>
-
 		<!-- Test -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -59,12 +53,6 @@
 			<artifactId>spring-boot-starter-cache</artifactId>
 		</dependency>
 
-		<!-- Kafka -->
-		<dependency>
-			<groupId>org.springframework.kafka</groupId>
-			<artifactId>spring-kafka</artifactId>
-		</dependency>
-
 		<!-- Events -->
 		<dependency>
 			<groupId>com.ecom</groupId>
@@ -72,6 +60,17 @@
 			<version>1.0.0</version>
 		</dependency>
 
+		<!-- Kafka -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<scope>provided</scope>
+		</dependency>
 	</dependencies>
 
 	<build>

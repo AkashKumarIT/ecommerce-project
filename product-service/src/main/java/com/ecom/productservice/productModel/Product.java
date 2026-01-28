@@ -25,6 +25,9 @@ public class Product {
     @Column(updatable = false, nullable = false)
     private UUID id;
 
+    @Column(nullable = false, unique = true)
+    private String sku;
+
     @Column(nullable = false)
     private String name;
 
