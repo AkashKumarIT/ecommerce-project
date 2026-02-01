@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface InventoryStockRepository extends JpaRepository<InventoryStock,String> {
@@ -16,4 +17,8 @@ public interface InventoryStockRepository extends JpaRepository<InventoryStock,S
     Optional<InventoryStock> findBySkuForUpdate(@Param("sku") String sku);
 
     boolean existsBySku(String sku);
+
+    // --- NEW BATCH METHOD ---
+    // Finds all stocks that match the list of SKUs
+    List<InventoryStock> findBySkuIn(List<String> skus);
 }

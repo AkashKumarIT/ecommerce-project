@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/inventory")
 @RequiredArgsConstructor
@@ -40,5 +42,12 @@ public class InventoryController {
     public ResponseEntity<Void> releaseInventory(@PathVariable String orderId) {
         inventoryService.releaseInventory(orderId);
         return ResponseEntity.ok().build();
+    }
+
+    // ---------------- CHECK STOCK ----------------
+
+    @GetMapping
+    public ResponseEntity<List<InventoryResponse>> isInStock(@RequestParam List<String> sku) {
+        return ResponseEntity.ok(inventoryService.isInStock(sku));
     }
 }

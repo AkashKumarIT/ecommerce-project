@@ -9,7 +9,7 @@ import com.ecom.inventory_service.model.InventoryStock;
 import com.ecom.inventory_service.model.ReservationStatus;
 import com.ecom.inventory_service.repository.InventoryReservationRepository;
 import com.ecom.inventory_service.repository.InventoryStockRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 //import lombok.var;
 import org.springframework.cache.annotation.CacheEvict;
@@ -17,6 +17,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -111,5 +112,18 @@ public class InventoryServiceImpl implements InventoryService {
             reservation.setStatus(ReservationStatus.RELEASED);
             reservationRepository.save(reservation);
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true) // Read-only is faster for checking stock
+    public List<InventoryResponse> isInStock(List<String> skus) {
+        return stockRepository.findBySkuIn(skus).stream()
+                .map(stock -> InventoryResponse.builder()
+                        .sku(stock.getSku())
+                        .availableQty(stock.getAvailableQty())
+                        .reservedQty(stock.getReservedQty())
+                        .updatedAt(stock.getUpdatedAt())
+                        .build()
+                ).toList();
     }
 }
