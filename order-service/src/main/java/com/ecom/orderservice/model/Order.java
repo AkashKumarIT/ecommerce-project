@@ -25,5 +25,6 @@ public class Order {
     private List<OrderLineItems> orderLineItemsList;
 
     // Status maintain karna zaroori hai (PENDING, PLACED)
-    private String status;
+    @Enumerated(EnumType.STRING)
+    private OrderStatus status;
 }

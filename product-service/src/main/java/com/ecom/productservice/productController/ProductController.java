@@ -23,6 +23,10 @@ public class ProductController {
         this.productService = productService;
     }
 
+    @GetMapping("/hello")
+    public String hello() {
+        return "Hello from Product Service";
+    }
     // 🌟 UNIFIED ENDPOINT
     // Valid Calls:
     // 1. GET /api/products (Get All)

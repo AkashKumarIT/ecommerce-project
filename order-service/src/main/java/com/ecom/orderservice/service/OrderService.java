@@ -1,11 +1,13 @@
 package com.ecom.orderservice.service;
 
-import com.ecom.orderservice.client.InventoryClient;
-import com.ecom.orderservice.dto.InventoryReservationRequest;
+import com.ecom.events.order.OrderCancelledEvent;
+import com.ecom.events.order.OrderCreatedEvent;
 import com.ecom.orderservice.dto.OrderRequest;
+import com.ecom.orderservice.kafka.EventPublisher;
 import com.ecom.orderservice.mappers.Mapper;
 import com.ecom.orderservice.model.Order;
 import com.ecom.orderservice.model.OrderLineItems;
+import com.ecom.orderservice.model.OrderStatus;
 import com.ecom.orderservice.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,55 +24,60 @@ import java.util.UUID;
 public class OrderService {
 
     private final OrderRepository orderRepository;
-    private final InventoryClient inventoryClient;
+    private final EventPublisher eventPublisher;
     private final Mapper mapper;
 
-    public String placeOrder(OrderRequest orderRequest) {
-        Order order = new Order();
-        String orderNumber = UUID.randomUUID().toString();
-        order.setOrderNumber(orderNumber);
+    @Transactional
+    public String placeOrder(OrderRequest request) {
 
-        log.info("at convert DTO to Entity");
-        // 1. Convert DTO to Entity
-        List<OrderLineItems> orderLineItems = orderRequest.getOrderLineItemsDtoList()
+        String orderNumber = UUID.randomUUID().toString();
+
+        Order order = new Order();
+        order.setOrderNumber(orderNumber);
+        order.setStatus(OrderStatus.PENDING);
+
+        List<OrderLineItems> items = request.getOrderLineItemsDtoList()
                 .stream()
                 .map(mapper::mapToDto)
                 .toList();
 
-        order.setOrderLineItemsList(orderLineItems);
-
-
-        // --- NEW RESERVATION LOGIC START ---
-        log.info("Preparing Reservation Request");
-
-        // 2. Prepare the Reservation Request DTO
-        List<InventoryReservationRequest.Item> reservationItems = order.getOrderLineItemsList().stream()
-                .map(item -> InventoryReservationRequest.Item.builder()
-                        .sku(item.getSku())
-                        .qty(item.getQuantity())
-                        .build())
-                .toList();
-
-        InventoryReservationRequest reservationRequest = InventoryReservationRequest.builder()
-                .orderId(orderNumber)
-                .items(reservationItems)
-                .build();
-
-        // 3. Call Inventory Service to RESERVE
-        log.info("Calling Inventory Service to Reserve Stock...");
-
-        // This call does two things:
-        inventoryClient.reserveInventory(reservationRequest);
-
-        // --- RESERVATION LOGIC END ---
-
-        // 4. If the code reaches here, it means Reservation was SUCCESSFUL.
-        log.info("Reservation Successful. Saving Order.");
-
-        order.setStatus("PLACED");
+        order.setOrderLineItemsList(items);
         orderRepository.save(order);
 
-        log.info("Order Placed Successfully: {}", order.getOrderNumber());
-        return "Order Placed Successfully";
+        // 🔥 Publish event
+        OrderCreatedEvent event = new OrderCreatedEvent(
+                orderNumber,
+                items.stream()
+                        .map(i -> new OrderCreatedEvent.OrderItem(
+                                i.getSku(), i.getQuantity()))
+                        .toList()
+        );
+
+        eventPublisher.publish("order-events", orderNumber, event);
+
+        return orderNumber;
+    }
+
+    public String cancelOrder(String orderNumber) {
+        // 1. Find the order by order number
+        Order order = orderRepository.findByOrderNumber(orderNumber)
+                .orElseThrow(() -> new RuntimeException("Order not found: " + orderNumber));
+
+        // 2. Call Inventory Service to RELEASE the reserved stock
+        log.info("Calling Inventory Service to Release Stock for Order: {}", orderNumber);
+
+
+        // 3. Update order status to CANCELLED
+        order.setStatus(OrderStatus.CANCELLED);
+        orderRepository.save(order);
+
+        eventPublisher.publish(
+                "order-events",
+                orderNumber,
+                new OrderCancelledEvent(orderNumber)
+        );
+
+        log.info("Order Cancelled Successfully: {}", orderNumber);
+        return "Order Cancelled Successfully";
     }
 }
