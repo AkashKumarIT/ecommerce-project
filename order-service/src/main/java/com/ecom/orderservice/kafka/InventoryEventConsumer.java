@@ -26,7 +26,6 @@ import java.util.UUID;
 public class InventoryEventConsumer {
 
     private final OrderRepository orderRepository;
-    private final EventPublisher eventPublisher;
     private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
 
@@ -35,7 +34,38 @@ public class InventoryEventConsumer {
             groupId = "order-service"
     )
     @Transactional
-    public void onInventoryReserved(InventoryReservedEvent event) {
+    public void onInventoryEvents(Object payload) {
+        try {
+            if (payload instanceof InventoryReservedEvent reservedEvent) {
+                handleInventoryReserved(reservedEvent);
+                return;
+            }
+
+            if (payload instanceof InventoryReservationFailedEvent failedEvent) {
+                handleInventoryFailed(failedEvent);
+                return;
+            }
+
+            String json = payload instanceof String s
+                    ? s
+                    : objectMapper.writeValueAsString(payload);
+            String eventType = objectMapper.readTree(json).path("eventType").asText("");
+
+            switch (eventType) {
+                case "INVENTORY_RESERVED" -> handleInventoryReserved(
+                        objectMapper.readValue(json, InventoryReservedEvent.class)
+                );
+                case "INVENTORY_RESERVATION_FAILED" -> handleInventoryFailed(
+                        objectMapper.readValue(json, InventoryReservationFailedEvent.class)
+                );
+                default -> log.debug("Ignoring inventory-events eventType={}", eventType);
+            }
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Failed to process inventory-events payload", ex);
+        }
+    }
+
+    private void handleInventoryReserved(InventoryReservedEvent event) {
 
         Order order = orderRepository
                 .findByOrderNumber(event.getOrderId())
@@ -55,32 +85,12 @@ public class InventoryEventConsumer {
                         order.getCartId()
                 );
 
-        OutboxEvent outboxEvent = null;
-        try {
-            outboxEvent = OutboxEvent.builder()
-                    .id(UUID.randomUUID())
-                    .aggregateId(order.getId())
-                    .aggregateType("ORDER")
-                    .eventType("ORDER_CONFIRMED")
-                    .payload(objectMapper.writeValueAsString(confirmedEvent))
-                    .status("NEW")
-                    .createdAt(Instant.now())
-                    .build();
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e + " Failed in onInventoryReserved of InventoryEventConsumer class");
-        }
-
-        outboxEventRepository.save(outboxEvent);
+        saveOutboxEvent(order, "ORDER_CONFIRMED", confirmedEvent);
 
         log.info("Order CONFIRMED: {}", event.getOrderId());
     }
 
-    @KafkaListener(
-            topics = "inventory-events",
-            groupId = "order-service"
-    )
-    @Transactional
-    public void onInventoryFailed(InventoryReservationFailedEvent event) {
+    private void handleInventoryFailed(InventoryReservationFailedEvent event) {
 
         Order order = orderRepository
                 .findByOrderNumber(event.getOrderId())
@@ -94,21 +104,36 @@ public class InventoryEventConsumer {
         order.setStatus(OrderStatus.REJECTED);
         orderRepository.save(order);
 
-        eventPublisher.publish(
-                "order-events",
+        OrderCancelledEvent cancelledEvent = new OrderCancelledEvent(
                 order.getOrderNumber(),
-                new OrderCancelledEvent(
-                        order.getOrderNumber(),
-                        order.getCartId(),
-                        event.getReason()
-                )
+                order.getCartId(),
+                event.getReason()
         );
-        
+
+        saveOutboxEvent(order, "ORDER_CANCELLED", cancelledEvent);
 
         log.warn(
                 "Order REJECTED: {} reason={}",
                 event.getOrderId(),
                 event.getReason()
         );
+    }
+
+    private void saveOutboxEvent(Order order, String eventType, Object eventPayload) {
+        try {
+            OutboxEvent outboxEvent = OutboxEvent.builder()
+                    .id(UUID.randomUUID())
+                    .aggregateId(order.getId())
+                    .aggregateType("ORDER")
+                    .eventType(eventType)
+                    .payload(objectMapper.writeValueAsString(eventPayload))
+                    .status("NEW")
+                    .createdAt(Instant.now())
+                    .build();
+
+            outboxEventRepository.save(outboxEvent);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to create order outbox event", e);
+        }
     }
 }

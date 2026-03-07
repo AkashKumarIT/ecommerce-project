@@ -12,6 +12,7 @@ import com.ecom.inventory_service.service.InventoryService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,8 +22,9 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class OrderEventConsumer {
-    private final EventPublisher kafkaPublisher;
+
     private final InventoryService inventoryService;
     private final InventoryMapper mapper;
     private final OutboxEventRepository outboxEventRepository;
@@ -30,62 +32,85 @@ public class OrderEventConsumer {
 
     @KafkaListener(topics = "order-events", groupId = "inventory-service")
     @Transactional
-    public void handleOrderCreated(OrderCreatedEvent event) {
-
+    public void handleOrderEvents(Object payload) {
         try {
-            InventoryReservationRequest request =
-                    mapper.mapToReservation(event);
+            if (payload instanceof OrderCreatedEvent createdEvent) {
+                handleOrderCreated(createdEvent);
+                return;
+            }
+
+            if (payload instanceof OrderCancelledEvent cancelledEvent) {
+                handleOrderCancelled(cancelledEvent);
+                return;
+            }
+
+            String json = payload instanceof String s
+                    ? s
+                    : objectMapper.writeValueAsString(payload);
+            String eventType = objectMapper.readTree(json).path("eventType").asText("");
+
+            switch (eventType) {
+                case "ORDER_CREATED" -> handleOrderCreated(
+                        objectMapper.readValue(json, OrderCreatedEvent.class)
+                );
+                case "ORDER_CANCELLED" -> handleOrderCancelled(
+                        objectMapper.readValue(json, OrderCancelledEvent.class)
+                );
+                default -> log.debug("Ignoring order-events eventType={}", eventType);
+            }
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Failed to process order-events payload", ex);
+        }
+    }
+
+    private void handleOrderCreated(OrderCreatedEvent event) {
+        try {
+            InventoryReservationRequest request = mapper.mapToReservation(event);
+            if (request.getItems() == null || request.getItems().isEmpty()) {
+                throw new IllegalStateException("ORDER_CREATED event has no items to reserve");
+            }
 
             inventoryService.reserveInventory(request);
 
             InventoryReservedEvent reservedEvent =
                     new InventoryReservedEvent(event.getOrderId());
 
-            OutboxEvent outbox = OutboxEvent.builder()
-                    .id(UUID.randomUUID())
-                    .aggregateId(UUID.fromString(event.getOrderId()))
-                    .aggregateType("INVENTORY")
-                    .eventType("INVENTORY_RESERVED")
-                    .payload(objectMapper.writeValueAsString(reservedEvent))
-                    .status("NEW")
-                    .createdAt(Instant.now())
-                    .build();
-
-            outboxEventRepository.save(outbox);
+            saveOutbox(event.getOrderId(), "INVENTORY_RESERVED", reservedEvent);
 
         } catch (Exception ex) {
-
             InventoryReservationFailedEvent failedEvent =
                     new InventoryReservationFailedEvent(
                             event.getOrderId(),
                             ex.getMessage()
                     );
 
-            String payload;
-
-            try {
-                payload = objectMapper.writeValueAsString(failedEvent);
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException("Failed to serialize event", e);
-            }
-
-            OutboxEvent outbox = OutboxEvent.builder()
-                    .id(UUID.randomUUID())
-                    .aggregateId(UUID.fromString(event.getOrderId()))
-                    .aggregateType("INVENTORY")
-                    .eventType("INVENTORY_RESERVATION_FAILED")
-                    .payload(payload)
-                    .status("NEW")
-                    .createdAt(Instant.now())
-                    .build();
-
-            outboxEventRepository.save(outbox);
+            saveOutbox(event.getOrderId(), "INVENTORY_RESERVATION_FAILED", failedEvent);
         }
     }
 
-    @KafkaListener(topics = "order-events", groupId = "inventory-service")
-    @Transactional
-    public void handleOrderCancelled(OrderCancelledEvent event) {
+    private void handleOrderCancelled(OrderCancelledEvent event) {
         inventoryService.releaseInventory(event.getOrderId());
+    }
+
+    private void saveOutbox(String orderId, String eventType, Object event) {
+        String payload;
+
+        try {
+            payload = objectMapper.writeValueAsString(event);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize inventory outbox payload", e);
+        }
+
+        OutboxEvent outbox = OutboxEvent.builder()
+                .id(UUID.randomUUID())
+                .aggregateId(UUID.fromString(orderId))
+                .aggregateType("INVENTORY")
+                .eventType(eventType)
+                .payload(payload)
+                .status("NEW")
+                .createdAt(Instant.now())
+                .build();
+
+        outboxEventRepository.save(outbox);
     }
 }

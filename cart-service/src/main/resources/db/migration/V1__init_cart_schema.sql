@@ -1,4 +1,4 @@
-CREATE TABLE cart (
+CREATE TABLE IF NOT EXISTS cart (
     id UUID PRIMARY KEY,
     user_id VARCHAR(100),
     guest_id VARCHAR(100),
@@ -9,10 +9,10 @@ CREATE TABLE cart (
     updated_at TIMESTAMP NOT NULL
 );
 
-CREATE INDEX idx_cart_user ON cart(user_id);
-CREATE INDEX idx_cart_guest ON cart(guest_id);
+CREATE INDEX IF NOT EXISTS idx_cart_user ON cart(user_id);
+CREATE INDEX IF NOT EXISTS idx_cart_guest ON cart(guest_id);
 
-CREATE TABLE cart_item (
+CREATE TABLE IF NOT EXISTS cart_item (
     id UUID PRIMARY KEY,
     cart_id UUID NOT NULL,
     product_id UUID NOT NULL,
@@ -29,10 +29,10 @@ CREATE TABLE cart_item (
         ON DELETE CASCADE
 );
 
-CREATE INDEX idx_cart_item_cart ON cart_item(cart_id);
-CREATE INDEX idx_cart_item_sku ON cart_item(sku);
+CREATE INDEX IF NOT EXISTS idx_cart_item_cart ON cart_item(cart_id);
+CREATE INDEX IF NOT EXISTS idx_cart_item_sku ON cart_item(sku);
 
-CREATE TABLE idempotency_record (
+CREATE TABLE IF NOT EXISTS idempotency_record (
     id UUID PRIMARY KEY,
     idempotency_key VARCHAR(255) NOT NULL UNIQUE,
     request_hash TEXT NOT NULL,
@@ -40,7 +40,7 @@ CREATE TABLE idempotency_record (
     created_at TIMESTAMP NOT NULL
 );
 
-CREATE TABLE outbox_event (
+CREATE TABLE IF NOT EXISTS outbox_event (
     id UUID PRIMARY KEY,
     aggregate_id UUID NOT NULL,
     aggregate_type VARCHAR(100) NOT NULL,
@@ -51,4 +51,4 @@ CREATE TABLE outbox_event (
     published_at TIMESTAMP
 );
 
-CREATE INDEX idx_outbox_status ON outbox_event(status);
+CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox_event(status);

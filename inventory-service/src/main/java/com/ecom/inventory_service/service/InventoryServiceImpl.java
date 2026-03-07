@@ -9,12 +9,11 @@ import com.ecom.inventory_service.model.InventoryStock;
 import com.ecom.inventory_service.model.ReservationStatus;
 import com.ecom.inventory_service.repository.InventoryReservationRepository;
 import com.ecom.inventory_service.repository.InventoryStockRepository;
-import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
-//import lombok.var;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -43,8 +42,6 @@ public class InventoryServiceImpl implements InventoryService {
         );
     }
 
-    // ---------------- RESERVE ----------------
-
     @Override
     @Transactional
     @CacheEvict(value = "inventory", allEntries = true)
@@ -52,7 +49,6 @@ public class InventoryServiceImpl implements InventoryService {
 
         for (InventoryReservationRequest.Item item : request.getItems()) {
 
-            // Idempotency check
             Optional<InventoryReservation> existing =
                     reservationRepository
                             .findByOrderIdAndSku(
@@ -63,8 +59,8 @@ public class InventoryServiceImpl implements InventoryService {
             if (existing.isPresent()) {
 
                 if (existing.get().getStatus() == ReservationStatus.RESERVED) {
-                    // Already reserved → idempotent success
-                    return;
+                    // Idempotent success for this item; continue with remaining items.
+                    continue;
                 }
 
                 if (existing.get().getStatus() == ReservationStatus.RELEASED) {
@@ -101,8 +97,6 @@ public class InventoryServiceImpl implements InventoryService {
         }
     }
 
-    // ---------------- RELEASE ----------------
-
     @Override
     @Transactional
     @CacheEvict(value = "inventory", allEntries = true)
@@ -129,7 +123,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    @Transactional(readOnly = true) // Read-only is faster for checking stock
+    @Transactional(readOnly = true)
     public List<InventoryResponse> isInStock(List<String> skus) {
         return stockRepository.findBySkuIn(skus).stream()
                 .map(stock -> InventoryResponse.builder()

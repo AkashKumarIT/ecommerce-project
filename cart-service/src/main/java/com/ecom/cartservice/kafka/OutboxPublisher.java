@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Component
 @RequiredArgsConstructor
@@ -33,7 +34,7 @@ public class OutboxPublisher {
                         "cart-events",
                         event.getAggregateId().toString(),
                         event.getPayload()
-                );
+                ).get(5, TimeUnit.SECONDS);
 
                 event.setStatus("PUBLISHED");
                 event.setPublishedAt(Instant.now());
@@ -41,9 +42,8 @@ public class OutboxPublisher {
                 outboxRepository.save(event);
 
             } catch (Exception e) {
-                log.error("Failed to publish event", e);
+                log.error("Failed to publish cart outbox event id={}", event.getId(), e);
             }
         }
     }
 }
-
