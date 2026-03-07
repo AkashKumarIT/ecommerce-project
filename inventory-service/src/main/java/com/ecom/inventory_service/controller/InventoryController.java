@@ -7,6 +7,7 @@ import com.ecom.inventory_service.service.InventoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,6 +21,7 @@ public class InventoryController {
 
     // ---------------- READ ----------------
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/{sku}")
     public ResponseEntity<InventoryResponse> getInventory(@PathVariable String sku) {
         InventoryResponse stock = inventoryService.getInventory(sku);
@@ -46,6 +48,7 @@ public class InventoryController {
 
     // ---------------- CHECK STOCK ----------------
 
+//    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public ResponseEntity<List<InventoryResponse>> isInStock(@RequestParam List<String> sku) {
         return ResponseEntity.ok(inventoryService.isInStock(sku));

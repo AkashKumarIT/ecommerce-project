@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -52,13 +53,26 @@ public class InventoryServiceImpl implements InventoryService {
         for (InventoryReservationRequest.Item item : request.getItems()) {
 
             // Idempotency check
-            reservationRepository
-                    .findByOrderIdAndSku(request.getOrderId(), item.getSku())
-                    .ifPresent(r -> {
-                        if (r.getStatus() == ReservationStatus.RESERVED) {
-                            return;
-                        }
-                    });
+            Optional<InventoryReservation> existing =
+                    reservationRepository
+                            .findByOrderIdAndSku(
+                                    request.getOrderId(),
+                                    item.getSku()
+                            );
+
+            if (existing.isPresent()) {
+
+                if (existing.get().getStatus() == ReservationStatus.RESERVED) {
+                    // Already reserved → idempotent success
+                    return;
+                }
+
+                if (existing.get().getStatus() == ReservationStatus.RELEASED) {
+                    throw new RuntimeException(
+                            "Reservation already released for order: "
+                                    + request.getOrderId());
+                }
+            }
 
             InventoryStock stock = stockRepository
                     .findBySkuForUpdate(item.getSku())

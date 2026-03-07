@@ -32,11 +32,42 @@ public class SecurityConfig {
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchange -> exchange
 
-                        // 🟢 PUBLIC
-                        .pathMatchers(HttpMethod.GET,
-                                "/product-service/api/products",
-                                "/product-service/api/products/**"
+                        // 🟢 PUBLIC (Add Swagger and OpenAPI paths here)
+                        .pathMatchers(
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/webjars/**",
+                                "/*/v3/api-docs"  // This allows docs from all microservices through the gateway
                         ).permitAll()
+
+                        // 🟢 PUBLIC (Product endpoints are public for GET, but protected for POST/PUT/DELETE)
+                        .pathMatchers(HttpMethod.GET,
+                                "/product-service/api/products/**"
+//                                "/product-service/api/products/**"
+                        ).permitAll()
+
+                        // 🟢 Guest cart operations
+                        .pathMatchers(
+                                HttpMethod.POST,
+                                "/cart-service/api/cart/items"
+                        ).permitAll()
+
+                        .pathMatchers(
+                                HttpMethod.GET,
+                                "/cart-service/api/cart"
+                        ).permitAll()
+
+                        .pathMatchers(
+                                HttpMethod.PUT,
+                                "/cart-service/api/cart/items/**"
+                        ).permitAll()
+
+                        .pathMatchers(
+                                HttpMethod.DELETE,
+                                "/cart-service/api/cart/items/**"
+                        ).permitAll()
+
 
                         // 🔐 ADMIN
                         .pathMatchers(HttpMethod.POST,
@@ -52,8 +83,20 @@ public class SecurityConfig {
                         ).hasRole("ADMIN")
 
                         // 🔐 CUSTOMER
-                        .pathMatchers("/order-service/**")
+                        .pathMatchers(HttpMethod.POST,
+                                "/order-service/api/order/**")
                         .hasRole("CUSTOMER")
+
+                        .pathMatchers(HttpMethod.POST,
+                                "/order-service/api/order/cancel/**")
+                        .hasRole("CUSTOMER")
+
+                        // 🔐 Checkout requires login
+                        .pathMatchers(
+                                HttpMethod.POST,
+                                "/cart-service/api/cart/checkout"
+                        ).hasRole("CUSTOMER")
+
 
                         .anyExchange().authenticated()
                 )

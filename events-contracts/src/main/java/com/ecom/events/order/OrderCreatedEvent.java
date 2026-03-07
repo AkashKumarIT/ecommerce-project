@@ -2,18 +2,36 @@ package com.ecom.events.order;
 
 import com.ecom.events.base.DomainEvent;
 import java.util.List;
+import java.util.UUID;
 
 public class OrderCreatedEvent extends DomainEvent {
 
     private String orderId;
     private List<OrderItem> items;
+    private UUID cartId;
+    private String userId;
 
     public OrderCreatedEvent() {}
 
-    public OrderCreatedEvent(String orderId, List<OrderItem> items) {
+    public OrderCreatedEvent(
+            String orderId,
+            UUID cartId,
+            String userId,
+            List<OrderItem> items
+    ) {
         super("ORDER_CREATED", 1, null, null);
         this.orderId = orderId;
+        this.cartId = cartId;
+        this.userId = userId;
         this.items = items;
+    }
+
+    public UUID getCartId() {
+        return cartId;
+    }
+
+    public String getUserId() {
+        return userId;
     }
 
     public String getOrderId() {

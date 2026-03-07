@@ -96,13 +96,6 @@ public class ProductService {
         List<Product> savedProducts = productRepository.saveAll(products);
         savedProducts.forEach(product -> {
 
-//            ProductCreatedEvent event =
-//                    ProductCreatedEvent.builder()
-//                            .eventType("PRODUCT_CREATED")
-//                            .sku(product.getSku())
-//                            .initialQuantity(product.getQuantity())
-//                            .build();
-
             ProductCreatedEvent event =
                     new ProductCreatedEvent(
                             product.getSku(),

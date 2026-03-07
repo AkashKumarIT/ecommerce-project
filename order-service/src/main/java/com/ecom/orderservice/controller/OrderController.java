@@ -5,6 +5,7 @@
     import lombok.RequiredArgsConstructor;
     import lombok.extern.slf4j.Slf4j;
     import org.springframework.http.HttpStatus;
+    import org.springframework.security.access.prepost.PreAuthorize;
     import org.springframework.web.bind.annotation.*;
 
     @RestController
@@ -15,6 +16,7 @@
 
         private final OrderService orderService;
 
+        @PreAuthorize("hasRole('CUSTOMER')")
         @PostMapping
         @ResponseStatus(HttpStatus.CREATED)
         public String placeOrder(@RequestBody OrderRequest orderRequest) {
@@ -22,6 +24,7 @@
             return orderService.placeOrder(orderRequest);
         }
 
+        @PreAuthorize("hasRole('CUSTOMER')")
         @PostMapping("/cancel/{orderNumber}")
         @ResponseStatus(HttpStatus.OK)
         public String cancelOrder(@PathVariable String orderNumber) {

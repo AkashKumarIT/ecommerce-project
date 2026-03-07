@@ -4,15 +4,16 @@ import com.ecom.productservice.productDto.ProductRequest;
 import com.ecom.productservice.productDto.ProductResponse;
 import com.ecom.productservice.productModel.Product;
 import com.ecom.productservice.productServices.ProductService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/products")
@@ -50,13 +51,7 @@ public class ProductController {
     }
 
 
-
-//    @PostMapping
-//    public ResponseEntity<ProductResponse> createProduct(@Valid @RequestBody ProductRequest req) {
-//        ProductResponse product = productService.createProduct(req);
-//        return ResponseEntity.created(URI.create("/api/products/" + product.getId())).body(product);
-//    }
-
+    @PreAuthorize("hasRole('ADMIN')") // Only admins can create products
     @PostMapping // I recommend adding a specific path like '/bulk' or just use '/'
     public ResponseEntity<List<ProductResponse>> createProducts(@RequestBody List<ProductRequest> requests) {
         List<ProductResponse> responses = productService.createProducts(requests);
@@ -72,6 +67,7 @@ public class ProductController {
 
 
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<ProductResponse> updateProduct(@PathVariable UUID id, @Valid @RequestBody ProductRequest req) {
         ProductResponse updatedProduct = productService.updateProduct(id, req);
@@ -79,6 +75,7 @@ public class ProductController {
     }
 
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(@PathVariable UUID id) {
         productService.deleteProduct(id);
