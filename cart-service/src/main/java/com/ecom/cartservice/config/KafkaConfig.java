@@ -12,20 +12,11 @@ import org.springframework.util.backoff.FixedBackOff;
 public class KafkaConfig {
 
     @Bean
-    public DefaultErrorHandler errorHandler(
-            KafkaTemplate<Object, Object> kafkaTemplate
-    ) {
+    public DefaultErrorHandler errorHandler(KafkaTemplate<Object, Object> kafkaTemplate) {
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate);
 
-        // Sends failed messages to <topic>.DLT
-        DeadLetterPublishingRecoverer recoverer =
-                new DeadLetterPublishingRecoverer(kafkaTemplate);
-
-        // Retry 3 times, 3 seconds gap
-        FixedBackOff backOff = new FixedBackOff(
-                3000L,  // 3 sec delay
-                3       // 3 retries
-        );
-
-        return new DefaultErrorHandler(recoverer, backOff);
+        // ✅ FIX: 0L, 0L ka matlab hai - No retries for bad messages like 'cls'
+        // Isse message turant skip hokar DLT mein chala jayega aur service crash nahi hogi
+        return new DefaultErrorHandler(recoverer, new FixedBackOff(0L, 0L));
     }
 }

@@ -26,10 +26,7 @@ public class CartCheckoutInitiatedEvent extends DomainEvent {
             List<Item> items
     ) {
         super(
-                "CART_CHECKOUT_INITIATED",
-                1,
-                UUID.randomUUID(),
-                Instant.now()
+                "CART_CHECKOUT_INITIATED"
         );
 
         this.cartId = cartId;

@@ -11,15 +11,12 @@ import org.springframework.util.backoff.FixedBackOff;
 public class KafkaConfig {
 
     @Bean
-    public DefaultErrorHandler errorHandler(
-            KafkaTemplate<Object, Object> template) {
+    public DefaultErrorHandler errorHandler(KafkaTemplate<Object, Object> template) {
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(template);
 
-        DeadLetterPublishingRecoverer recoverer =
-                new DeadLetterPublishingRecoverer(template);
+        // Serialization errors ko retry karne ka koi fayda nahi hota
+        DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, new FixedBackOff(0L, 0L));
 
-        FixedBackOff backOff =
-                new FixedBackOff(3000L, 3); // 3 retries, 3 sec delay
-
-        return new DefaultErrorHandler(recoverer, backOff);
+        return handler;
     }
 }

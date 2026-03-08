@@ -151,9 +151,11 @@
         <module>events-contracts</module>
         <module>product-service</module>
         <module>inventory-service</module>
-        <module>order-service</module>
+        <module>order-service</module>        <module>payment-service</module>
         <module>eureka-server</module>
         <module>api-gateway</module>
         <module>cart-service</module>
     </modules>
 </project>
+
+

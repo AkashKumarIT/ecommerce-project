@@ -69,7 +69,7 @@ public class InventoryEventConsumer {
 
         Order order = orderRepository
                 .findByOrderNumber(event.getOrderId())
-                .orElseThrow();
+                .orElseThrow(() -> new com.ecom.orderservice.exception.ResourceNotFoundException("Order not found"));
 
         if (order.getStatus() == OrderStatus.CONFIRMED) {
             log.info("Order already confirmed. Ignoring duplicate event.");
@@ -94,7 +94,7 @@ public class InventoryEventConsumer {
 
         Order order = orderRepository
                 .findByOrderNumber(event.getOrderId())
-                .orElseThrow();
+                .orElseThrow(() -> new com.ecom.orderservice.exception.ResourceNotFoundException("Order not found"));
 
         if (order.getStatus() == OrderStatus.REJECTED) {
             log.info("Order already rejected. Ignoring duplicate event.");

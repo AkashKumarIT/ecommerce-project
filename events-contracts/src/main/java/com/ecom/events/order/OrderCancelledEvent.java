@@ -19,10 +19,7 @@ public class OrderCancelledEvent extends DomainEvent {
             String reason
     ) {
         super(
-                "ORDER_CANCELLED",
-                1,
-                UUID.randomUUID(),
-                Instant.now()
+                "ORDER_CANCELLED"
         );
         this.orderId = orderId;
         this.cartId = cartId;

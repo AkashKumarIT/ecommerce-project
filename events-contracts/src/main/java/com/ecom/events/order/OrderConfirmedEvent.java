@@ -15,10 +15,7 @@ public class OrderConfirmedEvent extends DomainEvent {
 
     public OrderConfirmedEvent(String orderId, UUID cartId) {
         super(
-                "ORDER_CONFIRMED",
-                1,
-                UUID.randomUUID(),
-                Instant.now()
+                "ORDER_CONFIRMED"
         );
         this.orderId = orderId;
         this.cartId = cartId;

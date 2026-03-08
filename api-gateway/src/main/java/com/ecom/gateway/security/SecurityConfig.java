@@ -1,6 +1,5 @@
 package com.ecom.gateway.security;
 
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -9,10 +8,10 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
-import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
+import org.springframework.security.web.server.SecurityWebFilterChain;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -20,83 +19,40 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-
 @Configuration
 @EnableReactiveMethodSecurity
 public class SecurityConfig {
 
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
-
         http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchange -> exchange
-
-                        // 🟢 PUBLIC (Add Swagger and OpenAPI paths here)
                         .pathMatchers(
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/webjars/**",
-                                "/*/v3/api-docs"  // This allows docs from all microservices through the gateway
+                                "/*/v3/api-docs"
                         ).permitAll()
 
-                        // 🟢 PUBLIC (Product endpoints are public for GET, but protected for POST/PUT/DELETE)
-                        .pathMatchers(HttpMethod.GET,
-                                "/product-service/api/products/**"
-//                                "/product-service/api/products/**"
-                        ).permitAll()
+                        .pathMatchers(HttpMethod.GET, "/product-service/api/products/**").permitAll()
 
-                        // 🟢 Guest cart operations
-                        .pathMatchers(
-                                HttpMethod.POST,
-                                "/cart-service/api/cart/items"
-                        ).permitAll()
+                        .pathMatchers(HttpMethod.POST, "/cart-service/api/cart/items").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/cart-service/api/cart").permitAll()
+                        .pathMatchers(HttpMethod.PUT, "/cart-service/api/cart/items/**").permitAll()
+                        .pathMatchers(HttpMethod.DELETE, "/cart-service/api/cart/items/**").permitAll()
 
-                        .pathMatchers(
-                                HttpMethod.GET,
-                                "/cart-service/api/cart"
-                        ).permitAll()
+                        .pathMatchers(HttpMethod.POST, "/product-service/api/products/**").hasRole("ADMIN")
+                        .pathMatchers(HttpMethod.PUT, "/product-service/api/products/**").hasRole("ADMIN")
+                        .pathMatchers(HttpMethod.DELETE, "/product-service/api/products/**").hasRole("ADMIN")
 
-                        .pathMatchers(
-                                HttpMethod.PUT,
-                                "/cart-service/api/cart/items/**"
-                        ).permitAll()
+                        .pathMatchers(HttpMethod.POST, "/order-service/api/order/**").hasRole("CUSTOMER")
+                        .pathMatchers(HttpMethod.POST, "/order-service/api/order/cancel/**").hasRole("CUSTOMER")
+                        .pathMatchers(HttpMethod.POST, "/cart-service/api/cart/checkout").hasRole("CUSTOMER")
 
-                        .pathMatchers(
-                                HttpMethod.DELETE,
-                                "/cart-service/api/cart/items/**"
-                        ).permitAll()
-
-
-                        // 🔐 ADMIN
-                        .pathMatchers(HttpMethod.POST,
-                                "/product-service/api/products/**"
-                        ).hasRole("ADMIN")
-
-                        .pathMatchers(HttpMethod.PUT,
-                                "/product-service/api/products/**"
-                        ).hasRole("ADMIN")
-
-                        .pathMatchers(HttpMethod.DELETE,
-                                "/product-service/api/products/**"
-                        ).hasRole("ADMIN")
-
-                        // 🔐 CUSTOMER
-                        .pathMatchers(HttpMethod.POST,
-                                "/order-service/api/order/**")
-                        .hasRole("CUSTOMER")
-
-                        .pathMatchers(HttpMethod.POST,
-                                "/order-service/api/order/cancel/**")
-                        .hasRole("CUSTOMER")
-
-                        // 🔐 Checkout requires login
-                        .pathMatchers(
-                                HttpMethod.POST,
-                                "/cart-service/api/cart/checkout"
-                        ).hasRole("CUSTOMER")
-
+                        .pathMatchers(HttpMethod.GET, "/payment-service/api/payments/**").hasAnyRole("CUSTOMER", "ADMIN")
+                        .pathMatchers(HttpMethod.POST, "/payment-service/api/payments/**").hasAnyRole("CUSTOMER", "ADMIN")
 
                         .anyExchange().authenticated()
                 )
@@ -107,26 +63,21 @@ public class SecurityConfig {
                 );
 
         return http.build();
-        }
+    }
 
     @Bean
     public ReactiveJwtAuthenticationConverterAdapter jwtAuthenticationConverter() {
-
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
 
-        // Custom logic to handle Keycloak's nested "realm_access" -> "roles" structure
-        // CHANGE HERE: Use 'Jwt' instead of 'OAuth2ResourceServerProperties.Jwt'
         converter.setJwtGrantedAuthoritiesConverter(new Converter<Jwt, Collection<GrantedAuthority>>() {
             @Override
             public Collection<GrantedAuthority> convert(Jwt jwt) {
-                // 1. Get the "realm_access" object
                 Map<String, Object> realmAccess = jwt.getClaim("realm_access");
 
                 if (realmAccess == null || realmAccess.isEmpty()) {
                     return Collections.emptyList();
                 }
 
-                // 2. Get the "roles" list from that object
                 @SuppressWarnings("unchecked")
                 List<String> roles = (List<String>) realmAccess.get("roles");
 
@@ -134,7 +85,6 @@ public class SecurityConfig {
                     return Collections.emptyList();
                 }
 
-                // 3. Convert to SimpleGrantedAuthority with "ROLE_" prefix
                 return roles.stream()
                         .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
                         .collect(Collectors.toList());
@@ -143,5 +93,4 @@ public class SecurityConfig {
 
         return new ReactiveJwtAuthenticationConverterAdapter(converter);
     }
-
 }

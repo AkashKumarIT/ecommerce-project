@@ -19,22 +19,20 @@ public class CartOrderEventConsumer {
 
     @KafkaListener(topics = "order-events", groupId = "cart-service")
     public void handleOrderEvents(Object payload) {
-        if (payload instanceof OrderConfirmedEvent confirmedEvent) {
-            cartService.handleOrderConfirmed(confirmedEvent);
-            return;
-        }
-
-        if (payload instanceof OrderCancelledEvent cancelledEvent) {
-            cartService.handleOrderCancelled(cancelledEvent);
-            return;
-        }
-
+        // Agar payload String (json) hai, toh seedha process karein
         if (payload instanceof String json) {
             routeJsonEvent(json);
             return;
         }
 
-        routeJsonEvent(writeValue(payload));
+        // Agar payload already sahi Event class hai (due to JsonDeserializer)
+        if (payload instanceof OrderConfirmedEvent confirmedEvent) {
+            cartService.handleOrderConfirmed(confirmedEvent);
+            return;
+        }
+
+        // Agar kuch aur hai, toh direct serialize karne ke bajaye check karein
+        log.warn("Unknown payload type received: {}", payload.getClass().getName());
     }
 
     private void routeJsonEvent(String json) {

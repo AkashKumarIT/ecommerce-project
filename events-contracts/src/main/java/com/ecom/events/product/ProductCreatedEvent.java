@@ -16,10 +16,7 @@ public class ProductCreatedEvent extends DomainEvent {
     }
     public ProductCreatedEvent(String sku, int initialQuantity) {
         super(
-                "PRODUCT_CREATED",
-                1,
-                UUID.randomUUID(),
-                Instant.now()
+                "PRODUCT_CREATED"
         );
         this.sku = sku;
         this.initialQuantity = initialQuantity;

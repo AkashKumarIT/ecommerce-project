@@ -12,10 +12,7 @@ public class ProductQuantityUpdatedEvent extends DomainEvent {
 
     public ProductQuantityUpdatedEvent(String sku, int newQuantity) {
         super(
-                "PRODUCT_QUANTITY_UPDATED",
-                1,
-                UUID.randomUUID(),
-                Instant.now()
+                "PRODUCT_QUANTITY_UPDATED"
         );
         this.sku = sku;
         this.newQuantity = newQuantity;

@@ -1,6 +1,8 @@
 package com.ecom.events.order;
 
 import com.ecom.events.base.DomainEvent;
+
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -10,6 +12,8 @@ public class OrderCreatedEvent extends DomainEvent {
     private List<OrderItem> items;
     private UUID cartId;
     private String userId;
+    private BigDecimal totalAmount;
+    private String currency;
 
     public OrderCreatedEvent() {}
 
@@ -19,10 +23,27 @@ public class OrderCreatedEvent extends DomainEvent {
             String userId,
             List<OrderItem> items
     ) {
-        super("ORDER_CREATED", 1, null, null);
+        super("ORDER_CREATED");
         this.orderId = orderId;
         this.cartId = cartId;
         this.userId = userId;
+        this.items = items;
+    }
+
+    public OrderCreatedEvent(
+            String orderId,
+            UUID cartId,
+            String userId,
+            BigDecimal totalAmount,
+            String currency,
+            List<OrderItem> items
+    ) {
+        super("ORDER_CREATED");
+        this.orderId = orderId;
+        this.cartId = cartId;
+        this.userId = userId;
+        this.totalAmount = totalAmount;
+        this.currency = currency;
         this.items = items;
     }
 
@@ -42,6 +63,14 @@ public class OrderCreatedEvent extends DomainEvent {
         return items;
     }
 
+    public BigDecimal getTotalAmount() {
+        return totalAmount;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
     public static class OrderItem {
         private String sku;
         private Integer qty;
@@ -58,6 +87,10 @@ public class OrderCreatedEvent extends DomainEvent {
         }
 
         public Integer getQty() {
+            return qty;
+        }
+
+        public Integer getQuantity() {
             return qty;
         }
     }

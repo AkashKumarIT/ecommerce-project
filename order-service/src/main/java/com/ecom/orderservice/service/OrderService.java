@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -34,13 +35,11 @@ public class OrderService {
     private final Mapper mapper;
 
     public String placeOrder(OrderRequest request) {
-
         String orderNumber = UUID.randomUUID().toString();
 
         Order order = new Order();
         order.setOrderNumber(orderNumber);
-        order.setStatus(OrderStatus.PENDING);
-        // Keep this flow valid even when order is not initiated by cart checkout.
+        order.setStatus(OrderStatus.PENDING_PAYMENT);
         order.setCartId(UUID.randomUUID());
 
         List<OrderLineItems> items = request.getOrderLineItemsDtoList()
@@ -51,34 +50,34 @@ public class OrderService {
         order.setOrderLineItemsList(items);
         orderRepository.save(order);
 
-        OrderCreatedEvent createdEvent =
-                new OrderCreatedEvent(
-                        orderNumber,
-                        order.getCartId(),
-                        order.getUserId(),
-                        items.stream()
-                                .map(i -> new OrderCreatedEvent.OrderItem(
-                                        i.getSku(), i.getQuantity()))
-                                .toList()
-                );
+        OrderCreatedEvent createdEvent = new OrderCreatedEvent(
+                orderNumber,
+                order.getCartId(),
+                order.getUserId(),
+                calculateTotal(items),
+                "INR",
+                items.stream()
+                        .map(i -> new OrderCreatedEvent.OrderItem(i.getSku(), i.getQuantity()))
+                        .toList()
+        );
 
         saveOutboxEvent(order, "ORDER_CREATED", createdEvent);
+        log.info("Order placed orderNumber={} status={}", orderNumber, order.getStatus());
         return orderNumber;
     }
 
     public String cancelOrder(String orderNumber) {
         Order order = orderRepository.findByOrderNumber(orderNumber)
-                .orElseThrow(() -> new RuntimeException("Order not found: " + orderNumber));
+                .orElseThrow(() -> new com.ecom.orderservice.exception.ResourceNotFoundException("Order not found: " + orderNumber));
 
         order.setStatus(OrderStatus.CANCELLED);
         orderRepository.save(order);
 
-        OrderCancelledEvent cancelledEvent =
-                new OrderCancelledEvent(
-                        orderNumber,
-                        order.getCartId(),
-                        "MANUAL_CANCEL"
-                );
+        OrderCancelledEvent cancelledEvent = new OrderCancelledEvent(
+                orderNumber,
+                order.getCartId(),
+                "MANUAL_CANCEL"
+        );
 
         saveOutboxEvent(order, "ORDER_CANCELLED", cancelledEvent);
 
@@ -96,7 +95,7 @@ public class OrderService {
 
         Order order = new Order();
         order.setOrderNumber(orderNumber);
-        order.setStatus(OrderStatus.PENDING);
+        order.setStatus(OrderStatus.PENDING_PAYMENT);
         order.setCartId(event.getCartId());
         order.setUserId(event.getUserId());
 
@@ -114,21 +113,30 @@ public class OrderService {
         order.setOrderLineItemsList(items);
         orderRepository.save(order);
 
-        OrderCreatedEvent orderCreatedEvent =
-                new OrderCreatedEvent(
-                        orderNumber,
-                        event.getCartId(),
-                        event.getUserId(),
-                        items.stream()
-                                .map(i -> new OrderCreatedEvent.OrderItem(
-                                        i.getSku(),
-                                        i.getQuantity()))
-                                .toList()
-                );
+        OrderCreatedEvent orderCreatedEvent = new OrderCreatedEvent(
+                orderNumber,
+                event.getCartId(),
+                event.getUserId(),
+                event.getTotalAmount() != null ? event.getTotalAmount() : calculateTotal(items),
+                "INR",
+                items.stream()
+                        .map(i -> new OrderCreatedEvent.OrderItem(i.getSku(), i.getQuantity()))
+                        .toList()
+        );
 
         saveOutboxEvent(order, "ORDER_CREATED", orderCreatedEvent);
 
-        log.info("Order created from cart event. orderNumber={}", orderNumber);
+        log.info("Order created from cart event. orderNumber={} cartId={}", orderNumber, event.getCartId());
+    }
+
+    private BigDecimal calculateTotal(List<OrderLineItems> items) {
+        return items.stream()
+                .map(i -> {
+                    BigDecimal price = i.getPrice() != null ? i.getPrice() : BigDecimal.ZERO;
+                    Integer quantity = i.getQuantity() != null ? i.getQuantity() : 0;
+                    return price.multiply(BigDecimal.valueOf(quantity));
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private void saveOutboxEvent(Order order, String eventType, Object eventPayload) {
@@ -149,3 +157,4 @@ public class OrderService {
         }
     }
 }
+

@@ -9,7 +9,7 @@ public class InventoryReservedEvent extends DomainEvent {
     public InventoryReservedEvent() {}
 
     public InventoryReservedEvent(String orderId) {
-        super("INVENTORY_RESERVED", 1, null, null);
+        super("INVENTORY_RESERVED");
         this.orderId = orderId;
     }
 

@@ -2,6 +2,7 @@ package com.ecom.events.base;
 
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 
@@ -14,12 +15,11 @@ public abstract class DomainEvent {
 
     protected DomainEvent() {}
 
-    protected DomainEvent(String eventType, int eventVersion,
-                          UUID eventId, Instant occurredAt) {
+    protected DomainEvent(String eventType) {
         this.eventType = eventType;
-        this.eventVersion = eventVersion;
-        this.eventId = eventId;
-        this.occurredAt = occurredAt;
+        this.eventVersion = 1;
+        this.eventId = UUID.randomUUID();
+        this.occurredAt = Instant.now();
     }
 
     public String getEventType() {

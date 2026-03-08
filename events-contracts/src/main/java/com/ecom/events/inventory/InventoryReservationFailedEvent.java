@@ -10,7 +10,7 @@ public class InventoryReservationFailedEvent extends DomainEvent {
     public InventoryReservationFailedEvent() {}
 
     public InventoryReservationFailedEvent(String orderId, String reason) {
-        super("INVENTORY_RESERVATION_FAILED", 1, null, null);
+        super("INVENTORY_RESERVATION_FAILED");
         this.orderId = orderId;
         this.reason = reason;
     }
