@@ -20,21 +20,27 @@ public class CartEventConsumer {
             topics = "cart-events",
             groupId = "order-service"
     )
-    public void handleCartCheckout(Object payload) {
+    // ✅ Parameter ko Object se String mein change kar diya
+    public void handleCartCheckout(String message) {
+        log.info("Order Service received raw cart message: {}", message);
         try {
-            CartCheckoutInitiatedEvent event;
-            if (payload instanceof CartCheckoutInitiatedEvent typedEvent) {
-                event = typedEvent;
-            } else if (payload instanceof String json) {
-                event = objectMapper.readValue(json, CartCheckoutInitiatedEvent.class);
-            } else {
-                event = objectMapper.convertValue(payload, CartCheckoutInitiatedEvent.class);
+            // ✅ Double Serialization (extra quotes aur slashes) hatane ka logic
+            String cleanMessage = message;
+            if (message.startsWith("\"") && message.endsWith("\"")) {
+                cleanMessage = objectMapper.readValue(message, String.class);
             }
 
-            log.info("Received CART_CHECKOUT_INITIATED for cartId={}", event.getCartId());
+            // Ab clean string ko directly apne Event object mein map karein
+            CartCheckoutInitiatedEvent event = objectMapper.readValue(cleanMessage, CartCheckoutInitiatedEvent.class);
+
+            log.info("Successfully parsed CART_CHECKOUT_INITIATED for cartId={}", event.getCartId());
+
+            // Order create karne wala method call karein
             orderService.createOrderFromCartEvent(event);
+
         } catch (Exception ex) {
-            throw new IllegalArgumentException("Failed to process cart-events payload", ex);
+            // ❌ Exception throw mat karna, warna loop mein fass jayega. Sirf log error karo.
+            log.error("Failed to process cart-events payload: {}", message, ex);
         }
     }
 }

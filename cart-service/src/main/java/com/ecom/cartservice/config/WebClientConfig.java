@@ -18,7 +18,7 @@ public class WebClientConfig {
                 .clientConnector(
                         new ReactorClientHttpConnector(
                                 HttpClient.create()
-                                        .responseTimeout(Duration.ofSeconds(3))
+                                        .responseTimeout(Duration.ofSeconds(15))
                         )
                 );
     }

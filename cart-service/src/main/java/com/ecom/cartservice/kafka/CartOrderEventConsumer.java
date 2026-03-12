@@ -17,46 +17,38 @@ public class CartOrderEventConsumer {
     private final CartService cartService;
     private final ObjectMapper objectMapper;
 
-    @KafkaListener(topics = "order-events", groupId = "cart-service")
-    public void handleOrderEvents(Object payload) {
-        // Agar payload String (json) hai, toh seedha process karein
-        if (payload instanceof String json) {
-            routeJsonEvent(json);
-            return;
-        }
-
-        // Agar payload already sahi Event class hai (due to JsonDeserializer)
-        if (payload instanceof OrderConfirmedEvent confirmedEvent) {
-            cartService.handleOrderConfirmed(confirmedEvent);
-            return;
-        }
-
-        // Agar kuch aur hai, toh direct serialize karne ke bajaye check karein
-        log.warn("Unknown payload type received: {}", payload.getClass().getName());
-    }
-
-    private void routeJsonEvent(String json) {
+    // ✅ Parameter ko 'Object payload' se 'String message' kar diya
+    @KafkaListener(topics = "order-events", groupId = "cart-service-final")
+    public void handleOrderEvents(String message) {
+        log.info("Cart Service received raw order message: {}", message);
         try {
-            String eventType = objectMapper.readTree(json).path("eventType").asText("");
+            // ✅ Double Serialization (extra quotes aur slashes) hatane ka logic
+            String cleanMessage = message;
+            if (message.startsWith("\"") && message.endsWith("\"")) {
+                cleanMessage = objectMapper.readValue(message, String.class);
+            }
+
+            // Ab clean JSON ko aaram se parse karein
+            String eventType = objectMapper.readTree(cleanMessage).path("eventType").asText("");
+
             switch (eventType) {
-                case "ORDER_CONFIRMED" -> cartService.handleOrderConfirmed(
-                        objectMapper.readValue(json, OrderConfirmedEvent.class)
-                );
-                case "ORDER_CANCELLED" -> cartService.handleOrderCancelled(
-                        objectMapper.readValue(json, OrderCancelledEvent.class)
-                );
+                case "ORDER_CONFIRMED" -> {
+                    log.info("Processing ORDER_CONFIRMED in Cart Service");
+                    cartService.handleOrderConfirmed(
+                            objectMapper.readValue(cleanMessage, OrderConfirmedEvent.class)
+                    );
+                }
+                case "ORDER_CANCELLED" -> {
+                    log.info("Processing ORDER_CANCELLED in Cart Service");
+                    cartService.handleOrderCancelled(
+                            objectMapper.readValue(cleanMessage, OrderCancelledEvent.class)
+                    );
+                }
                 default -> log.debug("Ignoring unsupported order eventType={}", eventType);
             }
         } catch (Exception ex) {
-            throw new IllegalArgumentException("Failed to process order-events payload", ex);
-        }
-    }
-
-    private String writeValue(Object payload) {
-        try {
-            return objectMapper.writeValueAsString(payload);
-        } catch (Exception ex) {
-            throw new IllegalArgumentException("Failed to convert payload to JSON", ex);
+            // ❌ Exception throw mat karna, bas log karna taaki consumer block na ho
+            log.error("Failed to process order-events payload: {}", message, ex);
         }
     }
 }

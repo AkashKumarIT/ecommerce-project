@@ -160,24 +160,28 @@ public class PaymentService {
         paymentRepository.findByOrderId(event.getOrderId())
                 .ifPresent(payment -> {
 
+                    // ✅ YEH HAI ASLI REFUND LOGIC
                     if (payment.getStatus() == PaymentStatus.SUCCESS) {
-                        log.warn(
-                                "Order cancelled but payment already SUCCESS orderId={}",
-                                event.getOrderId()
+                        payment.setStatus(PaymentStatus.REFUNDED); // SUCCESS ko REFUNDED me badlo
+                        paymentRepository.save(payment);
+                        log.info(
+                                "Payment REFUNDED due to order cancellation paymentId={} orderId={}",
+                                payment.getId(),
+                                payment.getOrderId()
                         );
                         return;
                     }
 
-                    if (payment.getStatus() == PaymentStatus.CANCELLED) {
-                        return;
+                    if (payment.getStatus() == PaymentStatus.CANCELLED || payment.getStatus() == PaymentStatus.FAILED) {
+                        return; // Already cancel/fail ho chuka hai toh kuch mat karo
                     }
 
+                    // Agar payment abhi pending/created thi, toh bas CANCEL kar do (paisa nahi kata)
                     payment.setStatus(PaymentStatus.CANCELLED);
-
                     paymentRepository.save(payment);
 
                     log.info(
-                            "Payment cancelled due to order cancellation paymentId={} orderId={}",
+                            "Payment safely CANCELLED (No money deducted) for paymentId={} orderId={}",
                             payment.getId(),
                             payment.getOrderId()
                     );

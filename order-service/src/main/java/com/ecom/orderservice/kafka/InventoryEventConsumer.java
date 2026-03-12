@@ -29,39 +29,37 @@ public class InventoryEventConsumer {
     private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
 
+
     @KafkaListener(
             topics = "inventory-events",
             groupId = "order-service"
     )
     @Transactional
-    public void onInventoryEvents(Object payload) {
+    // ✅ Parameter 'Object payload' ki jagah 'String message' kar diya
+    public void onInventoryEvents(String message) {
+        log.info("Order Service received raw inventory message: {}", message);
         try {
-            if (payload instanceof InventoryReservedEvent reservedEvent) {
-                handleInventoryReserved(reservedEvent);
-                return;
+            // ✅ Double Serialization (extra quotes) hatane ka logic
+            String cleanMessage = message;
+            if (message.startsWith("\"") && message.endsWith("\"")) {
+                cleanMessage = objectMapper.readValue(message, String.class);
             }
 
-            if (payload instanceof InventoryReservationFailedEvent failedEvent) {
-                handleInventoryFailed(failedEvent);
-                return;
-            }
-
-            String json = payload instanceof String s
-                    ? s
-                    : objectMapper.writeValueAsString(payload);
-            String eventType = objectMapper.readTree(json).path("eventType").asText("");
+            // ✅ Clean JSON se eventType nikalna
+            String eventType = objectMapper.readTree(cleanMessage).path("eventType").asText("");
 
             switch (eventType) {
                 case "INVENTORY_RESERVED" -> handleInventoryReserved(
-                        objectMapper.readValue(json, InventoryReservedEvent.class)
+                        objectMapper.readValue(cleanMessage, InventoryReservedEvent.class)
                 );
                 case "INVENTORY_RESERVATION_FAILED" -> handleInventoryFailed(
-                        objectMapper.readValue(json, InventoryReservationFailedEvent.class)
+                        objectMapper.readValue(cleanMessage, InventoryReservationFailedEvent.class)
                 );
                 default -> log.debug("Ignoring inventory-events eventType={}", eventType);
             }
         } catch (Exception ex) {
-            throw new IllegalArgumentException("Failed to process inventory-events payload", ex);
+            // ❌ Error throw karne ki jagah log karein taaki consumer atke nahi
+            log.error("Failed to process inventory-events payload: {}", message, ex);
         }
     }
 

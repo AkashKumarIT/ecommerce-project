@@ -15,7 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+// ✅ org.springframework.transaction.annotation.Transactional import hata diya gaya hai
 
 import java.time.Instant;
 import java.util.UUID;
@@ -30,55 +30,54 @@ public class OrderEventConsumer {
     private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
 
+    // ✅ YAHAN SE @Transactional HATA DIYA HAI TAARI OUTBOX EVENT SAVE HO SAKE
     @KafkaListener(topics = "payment-events", groupId = "inventory-service")
-    @Transactional
-    public void handlePaymentEvents(Object payload) {
+    public void handlePaymentEvents(String message) {
+        log.info("Inventory Service received payment-event: {}", message);
         try {
-            if (payload instanceof PaymentCompletedEvent completedEvent) {
-                handlePaymentCompleted(completedEvent);
-                return;
+            String cleanMessage = message;
+            if (message.startsWith("\"") && message.endsWith("\"")) {
+                cleanMessage = objectMapper.readValue(message, String.class);
             }
 
-            String json = payload instanceof String s ? s : objectMapper.writeValueAsString(payload);
-            String eventType = objectMapper.readTree(json).path("eventType").asText("");
+            String eventType = objectMapper.readTree(cleanMessage).path("eventType").asText("");
 
             if ("PAYMENT_COMPLETED".equals(eventType)) {
-                handlePaymentCompleted(objectMapper.readValue(json, PaymentCompletedEvent.class));
-                return;
+                PaymentCompletedEvent event = objectMapper.readValue(cleanMessage, PaymentCompletedEvent.class);
+                handlePaymentCompleted(event);
+            } else {
+                log.debug("Ignoring eventType={} in inventory-service", eventType);
             }
-
-            log.debug("Ignoring payment-events eventType={} in inventory-service", eventType);
         } catch (Exception ex) {
-            throw new IllegalArgumentException("Failed to process payment-events payload", ex);
+            log.error("Failed to process payment-events payload", ex);
         }
     }
 
+    // ✅ YAHAN SE BHI @Transactional HATA DIYA HAI
     @KafkaListener(topics = "order-events", groupId = "inventory-service")
-    @Transactional
-    public void handleOrderEvents(Object payload) {
+    public void handleOrderEvents(String message) {
+        log.info("Inventory Service received order-event: {}", message);
         try {
-            if (payload instanceof OrderCancelledEvent cancelledEvent) {
-                handleOrderCancelled(cancelledEvent);
-                return;
+            String cleanMessage = message;
+            if (message.startsWith("\"") && message.endsWith("\"")) {
+                cleanMessage = objectMapper.readValue(message, String.class);
             }
 
-            String json = payload instanceof String s ? s : objectMapper.writeValueAsString(payload);
-            String eventType = objectMapper.readTree(json).path("eventType").asText("");
+            String eventType = objectMapper.readTree(cleanMessage).path("eventType").asText("");
 
             if ("ORDER_CANCELLED".equals(eventType)) {
-                handleOrderCancelled(objectMapper.readValue(json, OrderCancelledEvent.class));
-                return;
+                OrderCancelledEvent event = objectMapper.readValue(cleanMessage, OrderCancelledEvent.class);
+                handleOrderCancelled(event);
             }
-
-            log.debug("Ignoring order-events eventType={} in inventory-service", eventType);
         } catch (Exception ex) {
-            throw new IllegalArgumentException("Failed to process order-events payload", ex);
+            log.error("Failed to process order-events payload", ex);
         }
     }
 
     private void handlePaymentCompleted(PaymentCompletedEvent event) {
         try {
             InventoryReservationRequest request = mapper.mapToReservation(event);
+
             if (request.getItems() == null || request.getItems().isEmpty()) {
                 throw new IllegalStateException("PAYMENT_COMPLETED event has no items to reserve");
             }
@@ -89,13 +88,14 @@ public class OrderEventConsumer {
 
             log.info("Inventory reserved for orderId={} after successful payment", event.getOrderId());
         } catch (Exception ex) {
+            // ✅ Kahaani ka Hero: Ab yeh naya event DB mein independently save hoga!
             InventoryReservationFailedEvent failedEvent = new InventoryReservationFailedEvent(
                     event.getOrderId(),
                     ex.getMessage()
             );
 
             saveOutbox(event.getOrderId(), "INVENTORY_RESERVATION_FAILED", failedEvent);
-            log.error("Inventory reservation failed for orderId={} after payment", event.getOrderId(), ex);
+            log.error("Inventory reservation failed for orderId={} after payment. Sent Rollback Event.", event.getOrderId());
         }
     }
 
@@ -106,7 +106,6 @@ public class OrderEventConsumer {
 
     private void saveOutbox(String orderId, String eventType, Object event) {
         String payload;
-
         try {
             payload = objectMapper.writeValueAsString(event);
         } catch (JsonProcessingException e) {

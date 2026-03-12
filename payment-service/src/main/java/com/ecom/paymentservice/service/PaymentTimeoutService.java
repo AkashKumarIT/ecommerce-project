@@ -24,7 +24,7 @@ public class PaymentTimeoutService {
 
     private static final Duration PAYMENT_TIMEOUT = Duration.ofMinutes(15);
 
-    @Scheduled(fixedDelay = 60000)
+    @Scheduled(fixedDelay = 150000)
     public void cancelExpiredPayments() {
 
         Instant expiryTime = Instant.now().minus(PAYMENT_TIMEOUT);

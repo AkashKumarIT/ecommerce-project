@@ -2,6 +2,7 @@ package com.ecom.orderservice.service;
 
 import com.ecom.events.cart.CartCheckoutInitiatedEvent;
 import com.ecom.events.order.OrderCancelledEvent;
+import com.ecom.events.order.OrderConfirmedEvent;
 import com.ecom.events.order.OrderCreatedEvent;
 import com.ecom.orderservice.dto.OrderRequest;
 import com.ecom.orderservice.mappers.Mapper;
@@ -154,6 +155,40 @@ public class OrderService {
             outboxEventRepository.save(outboxEvent);
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to create order outbox event", e);
+        }
+    }
+
+    @Transactional
+    public void updateOrderStatus(String orderNumber, OrderStatus newStatus) {
+        Order order = orderRepository.findByOrderNumber(orderNumber)
+                .orElseThrow(() -> new RuntimeException("Order not found: " + orderNumber));
+
+        // Status update karo
+        order.setStatus(newStatus);
+        orderRepository.save(order);
+        log.info("Order status updated! OrderNumber: {} is now {}", orderNumber, newStatus);
+
+        // 🚨 Kahaani ka naya hissa: Event publish karna 🚨
+        // 🚨 Kahaani ka naya hissa: Event publish karna 🚨
+        if (newStatus == OrderStatus.CONFIRMED) {
+            // ✅ Fix: Sirf orderNumber aur cartId pass karein (jaise event class mein define hai)
+            OrderConfirmedEvent confirmedEvent = new OrderConfirmedEvent(
+                    order.getOrderNumber(),
+                    order.getCartId()
+            );
+            saveOutboxEvent(order, "ORDER_CONFIRMED", confirmedEvent);
+            log.info("Published ORDER_CONFIRMED event for OrderNumber: {}", orderNumber);
+
+        } else if (newStatus == OrderStatus.CANCELLED || newStatus == OrderStatus.REJECTED) {
+            // ⚠️ Dhyan dein: Agar OrderCancelledEvent mein bhi 3rd argument (reason) ka constructor nahi hai,
+            // toh yahan se "PAYMENT_FAILED_OR_TIMEOUT" hata dijiyega.
+            OrderCancelledEvent cancelledEvent = new OrderCancelledEvent(
+                    order.getOrderNumber(),
+                    order.getCartId(),
+                    "PAYMENT_FAILED_OR_TIMEOUT"
+            );
+            saveOutboxEvent(order, "ORDER_CANCELLED", cancelledEvent);
+            log.info("Published ORDER_CANCELLED event for OrderNumber: {}", orderNumber);
         }
     }
 }
